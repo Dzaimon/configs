@@ -1,0 +1,45 @@
+pipeline {
+    agent any
+    stages {
+        stage('Update Yarn Config') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'npm-creds',
+                        usernameVariable: 'NPM_USER',
+                        passwordVariable: 'NPM_PASS'
+                    )
+                ]) {
+                    sh '''
+                        # Функция для экранирования значений для YAML
+                        yaml_escape() {
+                            local str="$1"
+                            # Экранируем : -> \:
+                            str="${str//:/\\\\:}"
+                            # Экранируем кавычки
+                            str="${str//\"/\\\\\"}"
+                            echo "$str"
+                        }
+
+                        # Получаем экранированные значения
+                        ESC_USER=$(yaml_escape "$NPM_USER")
+                        ESC_PASS=$(yaml_escape "$NPM_PASS")
+
+                        # Временный маркер для безопасной замены
+                        TEMP_MARKER="AUTH_TEMP_MARKER"
+
+                        # 1. Сначала заменяем на временный маркер
+                        sed -i "s/^\([[:space:]]*npmAuthIdent:\).*/\1 $TEMP_MARKER/" .yarnrc.yml
+
+                        # 2. Затем заменяем маркер на реальные данные
+                        sed -i "s|$TEMP_MARKER|\"$ESC_USER:$ESC_PASS\"|" .yarnrc.yml
+
+                        Проверка (без показа секретов)
+                                                echo "Проверка изменений:"
+                                                grep -A2 "npmRegistries:" .yarnrc.yml | grep -v "npmAuthIdent"
+                                            '''
+                                        }
+                                    }
+                                }
+                            }
+                        }
